@@ -30,7 +30,7 @@ impl Note {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Field {
     pub order: usize,
@@ -47,12 +47,13 @@ struct AnkiResponse<T, E> {
     pub result: Option<T>,
 }
 
-impl<T, E> From<AnkiResponse<T, E>> for Result<T, E> {
+impl<T: Default, E> From<AnkiResponse<T, E>> for Result<T, E> {
     fn from(val: AnkiResponse<T, E>) -> Self {
         match (val.error, val.result) {
             (Some(err), _) => Err(err),
             (_, Some(result)) => Ok(result),
-            _ => unreachable!(),
+            (_, None) => Ok(Default::default()),
+            _ => unreachable!("result is null, do you want to load ()?"),
         }
     }
 }
@@ -110,4 +111,42 @@ pub async fn add_notes(
     let response =
         post::<Vec<Option<usize>>>(client, "addNotes", json!({ "notes": notes })).await?;
     Ok(response)
+}
+
+pub async fn delete_notes(client: &mut Client, config: &Config, notes: Vec<usize>) -> Result<()> {
+    post::<()>(client, "deleteNotes", json!({ "notes": notes })).await?;
+    Ok(())
+}
+
+pub async fn update_note_fields(
+    client: &mut Client,
+    config: &Config,
+    note_id: usize,
+    fields: HashMap<String, String>,
+) -> Result<()> {
+    post::<()>(
+        client,
+        "updateNoteFields",
+        json!({ "note": {
+            "id": note_id,
+            "fields": fields
+        }}),
+    )
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_tag(
+    client: &mut Client,
+    config: &Config,
+    notes: Vec<usize>,
+    tag: &str,
+) -> Result<()> {
+    post::<()>(
+        client,
+        "removeTags",
+        json!({ "notes": notes , "tags": tag }),
+    )
+    .await?;
+    Ok(())
 }
