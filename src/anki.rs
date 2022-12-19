@@ -8,7 +8,7 @@ use serde_repr::Deserialize_repr;
 
 use crate::Config;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
     pub cards: Vec<usize>,
@@ -30,7 +30,7 @@ impl Note {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Field {
     pub order: usize,

@@ -1,12 +1,12 @@
 use anyhow::Result;
 use reqwest::Client;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use serde_repr::Deserialize_repr;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::Config;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct LingQ {
     pub pk: usize,
     pub term: String,
@@ -18,7 +18,7 @@ pub struct LingQ {
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize_repr, Debug, Hash, PartialEq, Eq)]
+#[derive(Deserialize_repr, Serialize_repr, Debug, Hash, PartialEq, Eq)]
 #[repr(u16)]
 pub enum LingQStatus {
     New = 0,        // 1
@@ -27,7 +27,7 @@ pub enum LingQStatus {
     Known = 3,      // 4 or v
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Lesson {
     pub collection_title: String,
@@ -37,7 +37,7 @@ pub struct Lesson {
     pub views_count: usize,
 }
 
-#[derive(Deserialize_repr, Debug, PartialEq, Eq)]
+#[derive(Deserialize_repr, Serialize_repr, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ExtendedLingQStatus {
     Now = 0,
@@ -46,7 +46,7 @@ pub enum ExtendedLingQStatus {
     Never = 3,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LingQHint {
     pub term: String,
     pub text: String,
@@ -65,7 +65,7 @@ async fn get_languages(config: &Config) -> Result<()> {
         .await?
         .json()
         .await?;
-    dbg!(&response);
+    // dbg!(&response);
     Ok(())
 }
 
@@ -104,7 +104,7 @@ async fn get_paged<T: DeserializeOwned>(
             .error_for_status()?
             .json()
             .await?;
-        dbg!(&value);
+        // dbg!(&value);
         let courses = serde_json::from_value(value)?;
         Ok(courses)
     }
@@ -130,7 +130,7 @@ pub async fn get_courses(client: &mut Client, config: &Config) -> Result<()> {
     #[derive(Deserialize, Debug)]
     struct Course {}
     let courses: Vec<Value> = get_paged(client, config, API, "collections/", "").await?;
-    dbg!(&courses);
+    // dbg!(&courses);
     Ok(())
 }
 
@@ -143,7 +143,7 @@ pub async fn get_lessons(client: &mut Client, config: &Config) -> Result<Vec<Les
         &format!("&shelf=my_lessons&type=content&sortBy=recentlyOpened"),
     )
     .await?;
-    dbg!(&results);
+    // dbg!(&results);
     Ok(results)
 }
 
