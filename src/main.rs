@@ -25,14 +25,6 @@ pub struct Config {
 
     #[arg(long, default_value_t = 200)]
     lingq_page_size: usize,
-    // #[command(subcommand)]
-    // command: Command,
-}
-
-#[derive(clap::Subcommand, Debug, Copy, Clone)]
-enum Command {
-    Sync,
-    Migrate,
 }
 
 #[tokio::main]
