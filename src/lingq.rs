@@ -6,7 +6,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::Config;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LingQ {
     pub pk: usize,
     pub term: String,
@@ -18,7 +18,7 @@ pub struct LingQ {
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize_repr, Serialize_repr, Debug, Hash, PartialEq, Eq)]
+#[derive(Deserialize_repr, Serialize_repr, Debug, Hash, PartialEq, Eq, Clone, Copy)]
 #[repr(u16)]
 pub enum LingQStatus {
     New = 0,        // 1
@@ -27,7 +27,7 @@ pub enum LingQStatus {
     Known = 3,      // 4 or v
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Lesson {
     pub collection_title: String,
@@ -37,7 +37,7 @@ pub struct Lesson {
     pub views_count: usize,
 }
 
-#[derive(Deserialize_repr, Serialize_repr, Debug, PartialEq, Eq)]
+#[derive(Deserialize_repr, Serialize_repr, Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum ExtendedLingQStatus {
     Now = 0,

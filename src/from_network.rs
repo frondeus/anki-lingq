@@ -100,44 +100,44 @@ where
         }
     }
 
-    pub fn show<F, Fut>(&mut self, init: F, ui: &mut egui::Ui) -> Option<&mut T>
-    where
-        F: Fn() -> Fut,
-        Fut: Future<Output = Result<T>> + Send + 'static,
-    {
-        let promise = self
-            .promise
-            .get_or_insert_with(move || Promise::spawn_async(init()));
+    // pub fn show<F, Fut>(&mut self, init: F, ui: &mut egui::Ui) -> Option<&mut T>
+    // where
+    //     F: Fn() -> Fut,
+    //     Fut: Future<Output = Result<T>> + Send + 'static,
+    // {
+    //     let promise = self
+    //         .promise
+    //         .get_or_insert_with(move || Promise::spawn_async(init()));
 
-        match promise.ready_mut() {
-            None => {
-                ui.spinner();
-                None
-            }
-            Some(Err(err)) => {
-                ui.colored_label(egui::Color32::RED, err.to_string());
-                None
-            }
-            Some(Ok(t)) => {
-                if self.first_cache == false {
-                    self.first_cache = true;
-                    if let Some(cache) = self.cache.as_ref() {
-                        if let Ok(writer) = std::fs::OpenOptions::new()
-                            .create(true)
-                            .write(true)
-                            .truncate(true)
-                            .open(cache)
-                            .map(|f| BufWriter::new(f))
-                        {
-                            tracing::info!("Writing to cache");
-                            if let Err(e) = serde_json::to_writer(writer, t) {
-                                tracing::error!(error = ?e, "Could not write to cache");
-                            }
-                        }
-                    }
-                }
-                Some(t)
-            }
-        }
-    }
+    //     match promise.ready_mut() {
+    //         None => {
+    //             ui.spinner();
+    //             None
+    //         }
+    //         Some(Err(err)) => {
+    //             ui.colored_label(egui::Color32::RED, err.to_string());
+    //             None
+    //         }
+    //         Some(Ok(t)) => {
+    //             if self.first_cache == false {
+    //                 self.first_cache = true;
+    //                 if let Some(cache) = self.cache.as_ref() {
+    //                     if let Ok(writer) = std::fs::OpenOptions::new()
+    //                         .create(true)
+    //                         .write(true)
+    //                         .truncate(true)
+    //                         .open(cache)
+    //                         .map(|f| BufWriter::new(f))
+    //                     {
+    //                         tracing::info!("Writing to cache");
+    //                         if let Err(e) = serde_json::to_writer(writer, t) {
+    //                             tracing::error!(error = ?e, "Could not write to cache");
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //             Some(t)
+    //         }
+    //     }
+    // }
 }
