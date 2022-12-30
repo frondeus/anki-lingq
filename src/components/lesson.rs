@@ -20,20 +20,22 @@ pub struct LessonProps<'a> {
     lesson: &'a lingq::Lesson,
 }
 
-#[derive(PartialEq)]
-enum SyncState {
-    Default,
-    Loading,
-    Error(String),
-}
-
-pub async fn sync(config: &Config, client: &mut Client) -> Result<()> {
-    let notes = crate::anki::get_notes(client, config).await?;
-    let existing_notes = notes
+async fn get_lingqs(
+    client: &mut Client,
+    config: &Config,
+    source: lingq::Lesson,
+) -> Result<Vec<lingq::LingQ>> {
+    let source = [source];
+    let lingqs: Vec<LingQ> = lingq::get_lingqs(client, config, &source)
+        .await?
         .into_iter()
-        .filter_map(|note| note.fields.get("LingQ").map(|field| field.value.clone()))
-        .collect::<Vec<String>>();
-    Ok(())
+        .filter(|lingq| {
+            !(lingq.status == LingQStatus::Known
+                && lingq.extended_status == Some(ExtendedLingQStatus::Never))
+        })
+        .collect();
+
+    Ok(lingqs)
 }
 
 pub fn Lesson<'a>(cx: Scope<'a, LessonProps<'a>>) -> Element<'a> {
@@ -41,35 +43,8 @@ pub fn Lesson<'a>(cx: Scope<'a, LessonProps<'a>>) -> Element<'a> {
     let title = &cx.props.lesson.title;
     let id = &cx.props.lesson.id;
 
-    let sync_state = use_state(&cx, || SyncState::Default);
-    // let sync_future = use_future(&cx, (&sync_state.clone(),), move |(sync_state,)| {
-    //     async move {
-    //         match sync_state.get() {
-    //             SyncState::Default => (),
-    //             SyncState::Loading => sync(&config, &mut client).await,
-    //             SyncState::Finished => (),
-    //             SyncState::Error(e) => (),
-    //         }
-    //     }
-    // });
-    let sync_future = move || {
-        let config = cx.consume_context().expect("config");
-        let mut client = cx.consume_context().expect("client");
-        to_owned![sync_state];
-        async move {
-            if SyncState::Loading != *sync_state {
-                sync_state.set(SyncState::Loading);
-                if let Err(e) = sync(&config, &mut client).await {
-                    sync_state.set(SyncState::Error(e.to_string()));
-                } else {
-                    sync_state.set(SyncState::Default);
-                }
-            }
-            ()
-        }
-    };
-
     let opened_state = use_state(&cx, || false);
+    let and_sync = use_state(&cx, || false);
 
     let (lingqs, _) = use_opt_cached_future(
         &cx,
@@ -78,19 +53,8 @@ pub fn Lesson<'a>(cx: Scope<'a, LessonProps<'a>>) -> Element<'a> {
         || {
             let config = cx.consume_context().expect("config");
             let mut client = cx.consume_context().expect("client");
-            let source = [cx.props.lesson.clone()];
-            async move {
-                let lingqs: Vec<LingQ> = lingq::get_lingqs(&mut client, &config, &source)
-                    .await?
-                    .into_iter()
-                    .filter(|lingq| {
-                        !(lingq.status == LingQStatus::Known
-                            && lingq.extended_status == Some(ExtendedLingQStatus::Never))
-                    })
-                    .collect();
-
-                Ok(lingqs)
-            }
+            let lesson = cx.props.lesson.clone();
+            async move { get_lingqs(&mut client, &config, lesson).await }
         },
     );
 
@@ -109,36 +73,40 @@ pub fn Lesson<'a>(cx: Scope<'a, LessonProps<'a>>) -> Element<'a> {
         }
         Some(Some(Ok(o))) => Some(o),
     };
-    let lingqs_count = lingqs.as_ref().map(|lingqs| lingqs.len()).map(|count| {
-        rsx! {
-            span { "({count})" }
+    if *and_sync.get() {
+        if let Some(lingqs) = lingqs {
+            *popup.write() = PopupState::Sync {
+                lingqs: lingqs.clone(),
+            };
+            *and_sync.make_mut() = false;
+        } else {
+            *opened_state.make_mut() = true;
         }
-    });
-    let loader_style = css!(
-        "
-        border: 16px solid #f3f3f3;
-        border-top: 16px solid #3498db;
-        border-radius: 50%;
-        width: 120px;
-        height: 120px
-        animation: spin 2s linear infinite;  
-        "
-    );
-    let error_style = css!(
-        "
-            color: red;
-        "
-    );
-    let sync_status = match sync_state.get() {
-        SyncState::Default => None,
-        SyncState::Loading => Some(rsx! {
-            span { class: "{loader_style}" }
-        }),
-        SyncState::Error(err) => Some(rsx! {
-            div { class: "{error_style}", "{err}" }
-        }),
-    };
-    let lingqs = lingqs.map(|lingqs| {
+    }
+    let sync_button = lingqs
+        .map(|lingqs| {
+            let count = lingqs.len();
+            rsx! {
+                button { onclick: move |e| {
+                    *popup.write() = PopupState::Sync {
+                        lingqs: lingqs.clone()
+                    };
+                    e.cancel_bubble();
+                },
+                    "sync ({count})"
+                },
+            }
+        })
+        .unwrap_or_else(|| {
+            rsx! {
+                button { onclick: move |e| {
+                    *and_sync.make_mut() = true;
+                },
+                    "sync"
+                },
+            }
+        });
+    let rendered_lingqs = lingqs.map(|lingqs| {
         let lingqs = lingqs.iter().map(|lingq| {
             let term = &lingq.term;
             let style = css!(
@@ -153,7 +121,7 @@ pub fn Lesson<'a>(cx: Scope<'a, LessonProps<'a>>) -> Element<'a> {
             );
             rsx! {
                 div { class: "{style}", onclick: |_| {
-                   *popup.write() = PopupState::Opened {
+                   *popup.write() = PopupState::LingQ {
                         lingq: lingq.clone()
                     };
                 },
@@ -194,14 +162,8 @@ pub fn Lesson<'a>(cx: Scope<'a, LessonProps<'a>>) -> Element<'a> {
             opened_state.modify(|o| !o);
         },
             "{course} - {title}",
-            lingqs_count,
-            button { onclick: move |_| {
-                cx.spawn( sync_future() );
-            },
-                "sync"
-            },
-            sync_status,
-            lingqs
+            sync_button,
+            rendered_lingqs
         }
     })
 }

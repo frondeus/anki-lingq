@@ -3,7 +3,7 @@ use reqwest::Client;
 use sir::AppStyle;
 
 use crate::{
-    components::{lesson::Lesson, popup::LingQPopup},
+    components::{lesson::Lesson, popup::Popup},
     lingq, use_cached_future, Config,
 };
 
@@ -48,6 +48,6 @@ pub fn App(cx: Scope<AppProps>) -> Element {
             button { onclick: move |_| { refresh_lessons.refresh() }, "refresh" },
             lessons,
         }
-        LingQPopup {}
+        Popup {}
     })
 }

@@ -1,42 +1,30 @@
 use std::str::MatchIndices;
 
-use crate::lingq;
 use dioxus::prelude::*;
 use itertools::Itertools;
 use sir::css;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub enum PopupState {
     #[default]
     Closed,
-    Opened {
-        lingq: lingq::LingQ,
+    LingQ {
+        lingq: crate::lingq::LingQ,
+    },
+    Sync {
+        lingqs: Vec<crate::lingq::LingQ>,
     },
 }
 
 pub static POPUP: AtomRef<PopupState> = |_| PopupState::default();
 
-#[derive(PartialEq, Props)]
-pub struct LingQPopupProps {}
-
-enum Fragment<'a> {
-    Term(&'a str),
-    Rest(&'a str),
+#[derive(Props)]
+struct PopupProps<'a> {
+    children: Element<'a>,
 }
 
-pub fn LingQPopup<'a>(cx: Scope<LingQPopupProps>) -> Element {
+fn InnerPopup<'a>(cx: Scope<'a, PopupProps<'a>>) -> Element<'a> {
     let popup = use_atom_ref(&cx, POPUP);
-    let lingq = match &*popup.read() {
-        PopupState::Closed => return None,
-        PopupState::Opened { lingq } => lingq.clone(),
-    };
-    let hints = lingq.hints.iter().map(|hint| {
-        rsx! {
-            h4 {
-               "{hint.text}"
-            }
-        }
-    });
     let style = css!(
         "
         position: fixed;
@@ -45,59 +33,65 @@ pub fn LingQPopup<'a>(cx: Scope<LingQPopupProps>) -> Element {
         top: 0;
         width: 100%;
         height: 100%;
-        overflow: auto;
+        overflow: hidden;
         background-color: rgba(0,0,0,0.4);
         "
     );
 
     let content_style = css!(
         "
+        position: relative;
+        top: 50%;
+        left: 50%;
         width: 80%;
-        margin: 15% auto;
+        height: 80%;
+        transform: translate(-50%, -50%);
+        overflow: auto;
         background-color: #fefefe;
         padding: 1em;
         border: 1px solid #888;      
         "
     );
-    let fragment_style = css!(
-        "
-            text-align: center;
-        "
-    );
-    let hints_style = css!(
-        "
-            text-align: center;
-        "
-    );
-    let term = &lingq.term;
-    let lower_fragment = lingq.fragment.to_lowercase();
-
-    let fragments = SplitFragment::new(&lingq.fragment, lower_fragment.match_indices(term));
-
-    let fragment = fragments.map(|f| match f {
-        Fragment::Term(fragment) => rsx! { b { "{fragment}" } },
-        Fragment::Rest(fragment) => rsx! { "{fragment}"},
-    });
-
     cx.render(rsx! {
         div { class: "{style}", onclick: |_| {
             *popup.write() = PopupState::Closed
         },
             div { class: "{content_style}", onclick: |e| {
-              e.cancel_bubble();
+                e.cancel_bubble();
             },
-                div { class: "{fragment_style}",
-                    fragment
-                }
-                div { class: "{hints_style}",
-                    hints
-                }
+                &cx.props.children
             }
         }
     })
 }
 
-struct SplitFragment<'a, I>
+pub fn Popup(cx: Scope) -> Element {
+    let popup = use_atom_ref(&cx, POPUP);
+    match popup.read().clone() {
+        PopupState::Closed => None,
+        PopupState::LingQ { lingq } => cx.render(rsx! {
+            InnerPopup {
+                lingq::LingQPopup { lingq: lingq }
+            }
+        }),
+        PopupState::Sync { lingqs } => cx.render(rsx! {
+            InnerPopup {
+                sync::SyncPopup { lingqs: lingqs }
+            }
+        }),
+    }
+}
+
+mod sync;
+
+mod lingq;
+
+pub enum Fragment<'a> {
+    Term(&'a str),
+    Rest(&'a str),
+}
+
+pub struct SplitFragment<'a, I>
 where
     I: Iterator<Item = (usize, &'a str)>,
 {

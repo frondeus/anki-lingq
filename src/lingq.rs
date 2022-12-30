@@ -6,7 +6,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::Config;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct LingQ {
     pub pk: usize,
     pub term: String,
@@ -46,7 +46,7 @@ pub enum ExtendedLingQStatus {
     Never = 3,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct LingQHint {
     pub term: String,
     pub text: String,
